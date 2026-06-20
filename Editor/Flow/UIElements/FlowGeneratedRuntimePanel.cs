@@ -64,16 +64,20 @@ namespace Ceres.Editor.Graph.Flow
 
             var enabledProperty = _infoProperty.FindPropertyRelative(nameof(FlowGeneratedProgramInfo.enabled));
             var enabledToggle = new Toggle("Enabled");
+            var suppressEnabledToggleCallback = true;
             enabledToggle.AddToClassList("flow-generated-runtime-toggle");
-            enabledToggle.BindProperty(enabledProperty);
             enabledToggle.RegisterValueChangedCallback(_ =>
             {
+                if (suppressEnabledToggleCallback) return;
+
                 _serializedObject.ApplyModifiedProperties();
                 SynchronizeManualRuntime();
                 _serializedObject.Update();
                 Refresh();
             });
+            enabledToggle.BindProperty(enabledProperty);
             Add(enabledToggle);
+            enabledToggle.schedule.Execute(() => suppressEnabledToggleCallback = false);
 
             _details = new VisualElement();
             _details.AddToClassList("flow-generated-runtime-details");

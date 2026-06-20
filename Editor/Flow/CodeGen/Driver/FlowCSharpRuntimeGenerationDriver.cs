@@ -295,15 +295,22 @@ namespace Ceres.Editor.Graph.Flow.CodeGen
 
             foreach (var entry in ReadManifest().Entries)
             {
-                if (!TryResolveManifestContainer(entry, out var container, out _) ||
-                    !string.Equals(container.GeneratedRuntimeInfo.GetProgramId(), entry.programId,
-                        StringComparison.Ordinal))
+                if (TryResolveManifestContainer(entry, out var container, out _))
                 {
+                    if (!string.Equals(container.GeneratedRuntimeInfo.GetProgramId(), entry.programId,
+                            StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    if (TryCreateGeneratedProgramRegistration(container.GeneratedRuntimeInfo, out var registration))
+                        yield return registration;
+
                     continue;
                 }
 
-                if (TryCreateGeneratedProgramRegistration(container.GeneratedRuntimeInfo, out var registration))
-                    yield return registration;
+                if (TryCreateGeneratedProgramRegistration(entry, out var unresolvedRegistration))
+                    yield return unresolvedRegistration;
             }
         }
 
@@ -358,6 +365,44 @@ namespace Ceres.Editor.Graph.Flow.CodeGen
                 info.graphHash,
                 info.generatedTypeName,
                 identity.TypeReference);
+            return true;
+        }
+
+        private static bool TryCreateGeneratedProgramRegistration(GeneratedProgramManifestEntry entry,
+            out GeneratedProgramRegistration registration)
+        {
+            registration = default;
+            if (entry == null ||
+                !TryCreateGeneratedProgramRegistrationFromManifestData(entry.programId, entry.graphHash,
+                    entry.generatedTypeName, out var typeReference))
+            {
+                return false;
+            }
+
+            registration = new GeneratedProgramRegistration(
+                entry.programId,
+                entry.graphHash,
+                entry.generatedTypeName,
+                typeReference);
+            return true;
+        }
+
+        private static bool TryCreateGeneratedProgramRegistrationFromManifestData(string programId, string graphHash,
+            string generatedTypeName, out string typeReference)
+        {
+            typeReference = null;
+            if (!FlowGeneratedRuntimeUtility.UsesGeneratedRuntimeProgram ||
+                string.IsNullOrEmpty(programId) ||
+                string.IsNullOrEmpty(graphHash) ||
+                string.IsNullOrEmpty(generatedTypeName) ||
+                !GlobalObjectId.TryParse(programId, out _) ||
+                !GeneratedProgramIdentity.TryParse(generatedTypeName, out var identity) ||
+                !File.Exists(identity.SourcePath))
+            {
+                return false;
+            }
+
+            typeReference = identity.TypeReference;
             return true;
         }
 
