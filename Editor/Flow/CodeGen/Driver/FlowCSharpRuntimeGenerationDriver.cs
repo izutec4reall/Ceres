@@ -97,12 +97,27 @@ namespace Ceres.Editor.Graph.Flow.CodeGen
                 return;
             }
 
-            foreach (var entry in ReadManifest().Entries)
+            var entries = ReadManifest().Entries;
+            if (entries.Count == 0)
+            {
+                return;
+            }
+
+            RequireGeneratedSourceFile(GetGeneratedRegistrySourcePath(),
+                $"Generated C# runtime registry is missing. Run {FlowCSharpRuntimeGenerator.GenerateRuntimeMenuPath} before building.");
+            ValidateGeneratedRegistrySource();
+
+            foreach (var entry in entries)
             {
                 if (!TryResolveManifestContainer(entry, out var container, out var contextObject))
                 {
+                    if (TryCreateGeneratedProgramRegistration(entry, out _))
+                    {
+                        continue;
+                    }
+
                     throw new BuildFailedException(
-                        $"Generated C# runtime object {entry.objectName} is missing. Run {FlowCSharpRuntimeGenerator.GenerateRuntimeMenuPath} before building.");
+                        $"Generated C# runtime for {entry?.objectName ?? "manual object"} is missing or stale. Run {FlowCSharpRuntimeGenerator.GenerateRuntimeMenuPath} before building.");
                 }
 
                 var info = container.GeneratedRuntimeInfo;
