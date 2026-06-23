@@ -22,6 +22,13 @@ namespace Ceres.Graph.Flow
         [NonSerialized]
         private IFlowExecutableProgram _program;
 
+        /// <summary>
+        /// Local variable overrides per-instance.
+        /// Set in the Inspector to override blackboard variables from the shared FlowGraphAsset.
+        /// </summary>
+        [SerializeField]
+        private List<SharedVariable> localOverrides = new();
+
         public IFlowExecutableProgram Program
         {
             get
@@ -70,9 +77,58 @@ namespace Ceres.Graph.Flow
             using var context = FlowGraphCompilationContext.GetPooled();
             using var compiler = CeresGraphCompiler.GetPooled(graph, context);
             graph.Compile(compiler);
+            MergeOverrides(graph);
             return graph;
         }
-        
+
+        /// <summary>
+        /// Merge local variable overrides into the compiled runtime graph blackboard.
+        /// </summary>
+        private void MergeOverrides(FlowGraph graph)
+        {
+            if (localOverrides == null || localOverrides.Count == 0) return;
+            foreach (var overrideVar in localOverrides)
+            {
+                if (overrideVar == null || string.IsNullOrEmpty(overrideVar.Name)) continue;
+                if (graph.Blackboard.TryGetSharedVariable(overrideVar.Name, out SharedVariable target))
+                {
+                    target.SetValue(overrideVar.GetValue());
+                }
+            }
+        }
+
+        /// <summary>
+        /// Get all local override variables for this instance.
+        /// </summary>
+        internal List<SharedVariable> GetLocalOverrides()
+        {
+            return localOverrides ?? (localOverrides = new List<SharedVariable>());
+        }
+
+        /// <summary>
+        /// Set a local override value by variable name.
+        /// </summary>
+        internal void SetLocalOverride(SharedVariable variable)
+        {
+            var existing = localOverrides.FirstOrDefault(v => v.Name == variable.Name);
+            if (existing != null)
+            {
+                existing.SetValue(variable.GetValue());
+            }
+            else
+            {
+                localOverrides.Add(variable);
+            }
+        }
+
+        /// <summary>
+        /// Remove a local override by variable name.
+        /// </summary>
+        internal void RemoveLocalOverride(string variableName)
+        {
+            localOverrides.RemoveAll(v => v.Name == variableName);
+        }
+
         /// <summary>
         /// Release graph instance safely
         /// </summary>
