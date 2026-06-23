@@ -84,3 +84,4 @@ obj.meta
 /site~/*
 /.craft
 /Ceres
+/com.unity.visualscripting
